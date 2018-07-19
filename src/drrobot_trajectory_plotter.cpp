@@ -253,7 +253,7 @@ class TrajectoryPlotterNode
       void odomPublisher(Twist2D && twistVel)
     {
       static tf::TransformBroadcaster odom_broadcaster; //The broadcaster for the odometry->baselink transform
-      currentTime = ros::Time::now(); 
+      currentTime = ros::Time::now();
       geometry_msgs::TransformStamped odom_trans;
       odom_trans.header.stamp = currentTime;
       odom_trans.header.frame_id = "odom";
@@ -307,24 +307,13 @@ class TrajectoryPlotterNode
     //Callback function from "path"
     void pathCallback(const nav_msgs::Path::ConstPtr& pathmsg)
     {
-        static tf::TransformListener listener;
         if(pathRecieved == false)
         {
-          tf::StampedTransform transform;
-          try
-          {
-            listener.lookupTransform("/base_link", "/map", ros::Time(0), transform); //get the robot position relative to the map
-          }
-          catch (tf::TransformException &ex)
-          {
-            ROS_ERROR("%s",ex.what());
-            return;
-          }
-          for(int i =0; i<path.size();i++)
+          for(int i =0; i<pathmsg->poses.size();i++)
           {
             Pose2D temp;
-            temp.x = pathmsg->poses[i].pose.position.x - transform.getOrigin().x();
-            temp.y = pathmsg->poses[i].pose.position.y - transform.getOrigin().y();
+            temp.x = pathmsg->poses[i].pose.position.x;
+            temp.y = pathmsg->poses[i].pose.position.y;
             path.push_back(temp);
           }
           it = path.begin();
