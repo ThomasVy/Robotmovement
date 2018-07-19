@@ -16,6 +16,7 @@
 #include <tf/transform_listener.h>
 
 #include <sstream>
+#include <iostream>
 
 #define LOOPRATE         10                 //Looprate
 
@@ -119,6 +120,7 @@ class TrajectoryPlotterNode
     Pose2D GoalPose;                         //Goal position
     std::vector<Pose2D>::iterator it;        //Iterator
     ros::Time currentTime = ros::Time::now(); //Time
+    tf::TransformListener tflistener;
   private: // private methods
   //--------------------------------------Geometry Functions---------------------------------------------------//
 
@@ -148,8 +150,8 @@ class TrajectoryPlotterNode
       {
         if(pathRecieved == true)
         {
-            geometry_msgs::Twist msg;
-               ROS_INFO("Distance from GoalPose - [%f], GoalPose Coordinates - X: [%f], Y: [%f]", lengthAB(A, B), B.x, B.y);
+            static geometry_msgs::Twist msg;
+            ROS_INFO("Distance from GoalPose - [%f], GoalPose Coordinates - X: [%f], Y: [%f]", lengthAB(A, B), B.x, B.y);
             if(lengthAB(A, B)>LOOKAHEAD) //If the look-ahead distance hasn't been reached...
             {
               double angle = angleAB(A, B);
@@ -159,7 +161,7 @@ class TrajectoryPlotterNode
                 if (fabs(angle)>M_PI/4)           //If the angle is greater than 45 degrees, rotate but don't move forward
                 {
                    ROS_INFO("Rotating");
-                   msg.linear.x = 0;
+                   msg.linear.x /= 2;
                    msg.angular.z = angle/3;
                 }
                 else                                      //Else, rotate and move forward
@@ -176,23 +178,23 @@ class TrajectoryPlotterNode
                 msg.angular.z = 0;
               }
             }
-        else                         //Else...
-        {
-          if(it!=path.end())  //If you're not at the end of the path, go the next point
-          {
-            GoalPose = (*it);
-            it++;
-          }
-          else                //Else, stop
-          {
-            ROS_INFO("Goal Reached");
-            pathRecieved = false;
-            path.clear();
-            msg.angular.z = 0;
-            msg.linear.x = 0;
-          }
-        }
-        velocity_pub.publish(msg);
+            else                         //Else...
+            {
+              if(it!=path.end())  //If you're not at the end of the path, go the next point
+              {
+                GoalPose = (*it);
+                it++;
+              }
+              else                //Else, stop
+              {
+                ROS_INFO("Goal Reached");
+                pathRecieved = false;
+                path.clear();
+                msg.angular.z = 0;
+                msg.linear.x = 0;
+              }
+            }
+            velocity_pub.publish(msg);
       }
         ////ROS_INFO("Velocity message sent: [%f]", msg.linear.x);
     }
@@ -291,7 +293,7 @@ class TrajectoryPlotterNode
     {
       static tf::TransformBroadcaster broadcaster;
       broadcaster.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(0,0,0,1), tf::Vector3(0.03,0,0.1)), currentTime, "base_link", "laser"));
-      broadcaster.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(0,0,0,1), tf::Vector3(0.03,0,0.1)), currentTime, "laser", "scan"));
+      broadcaster.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(0,0,0,1), tf::Vector3(0,0,0.1)), currentTime, "laser", "scan"));
 
     }
 
@@ -323,6 +325,7 @@ class TrajectoryPlotterNode
             it++;
           }
           pathRecieved = true;
+          cmd_velPublisher(CurPose, GoalPose);
         }
     }
 
@@ -356,10 +359,9 @@ int main(int argc, char **argv)
   //Initializing
   ros::init(argc, argv, "drrobot_trajectory_plotter");
   TrajectoryPlotterNode DrRobotPlotterNode;
-  ros::spin();
-  while(ros::ok())
-  {
-  }
+  ros::AsyncSpinner spinner(2);
+  spinner.start();
+  ros::waitForShutdown();
   return 0;
 }
 //By Noam and Thomas
